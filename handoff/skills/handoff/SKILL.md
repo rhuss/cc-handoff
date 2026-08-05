@@ -190,11 +190,13 @@ When the SessionStart hook runs, it outputs a `<handoff-notify>` block with a co
 
 When the user says "load handoff":
 
+**IMPORTANT: ALWAYS use AskUserQuestion to let the user choose which handoffs to load. NEVER auto-select or auto-load handoffs, even if there is only one available. Do NOT display a table and then load a handoff yourself. The user must explicitly select via AskUserQuestion.**
+
 1. **Scan for pending handoffs**: List all `.md` files (not in `consumed/`) in `~/.claude/handoffs/<current-slug>/` and across all other project directories.
 
 2. **Empty state check**: If no pending handoffs exist for the current project and no cross-project handoffs exist, report "No pending handoffs for this project." and stop.
 
-3. **Build selection options**: Extract the date and `summary` from each pending handoff's frontmatter. Sort by filename (newest first). Build AskUserQuestion options:
+3. **Build AskUserQuestion options**: Extract the date and `summary` from each pending handoff's frontmatter. Sort by filename (newest first). Build AskUserQuestion options:
 
    - Show up to 3 most recent **current-project** handoffs as individual options:
      - `label`: Date (Mon DD) + summary snippet (truncated to ~60 chars)
@@ -203,8 +205,9 @@ When the user says "load handoff":
      - `label`: "All (N available)" where N = total handoffs across all projects
      - `description`: "Browse all handoffs including other projects"
    - If 3 or fewer current-project handoffs exist and no cross-project handoffs are available, omit the "All" option.
+   - Even with a single handoff, present it as an AskUserQuestion option so the user can choose to load or skip it.
 
-4. **Present selection**: Use AskUserQuestion with `multiSelect: true` to let the user choose one or more handoffs.
+4. **Present selection**: Call AskUserQuestion with `multiSelect: true` to let the user choose one or more handoffs. Wait for the user's response before proceeding.
 
 5. **Process selection**: For each selected handoff, follow the "Processing Selected Handoffs" steps below.
 
