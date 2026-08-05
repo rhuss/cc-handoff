@@ -2,12 +2,14 @@
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin for session handoffs. Creates structured narrative documents at session end that capture decisions, unfinished work, and subtle context for seamless pickup in future sessions.
 
+The handoff concept is inspired by Steve Yegge's ["Anti-Clonking Device"](https://yegge.ai/essays/model-welfare) idea: instead of abruptly ending a session and losing context, agents write their own handoff notes that the next session can pick up. As Yegge puts it, "the next day, they're just reading their diary, and with it comes much-needed clarity and continuity."
+
 ## How it works
 
 1. At the end of a session, run `/handoff`
 2. The agent reflects on the session and writes a handoff document to `~/.claude/handoffs/<project>/`
-3. A `SessionStart` hook (registered by the plugin) scans for pending handoffs automatically
-4. Next session, pending handoffs are listed and you can load any of them
+3. A `SessionStart` hook (registered by the plugin) scans for pending handoffs
+4. Next session, you can load any pending handoff when you're ready
 
 Handoff documents are organized by project (derived from git remote or directory name) and include YAML frontmatter with project, timestamp, branch, and summary fields.
 
@@ -85,23 +87,35 @@ When you start a new session, a compact notification tells you how many handoffs
 3 handoffs available (latest: Aug 5). Say "load handoff" to pick one up, or "load latest handoff" to skip selection.
 ```
 
-- **"load handoff"**: presents an interactive selection UI where you can pick one or more handoffs to load
-- **"load latest handoff"**: loads the most recent handoff immediately without any selection prompt
+You can load handoffs in several ways:
+
+- **"load handoff"** (or `/handoff --load`): presents an interactive selection UI where you can pick one or more handoffs to load
+- **"load latest handoff"** (or `/handoff --load-latest`): loads the most recent handoff immediately without any selection prompt
 - **"skip handoffs"**: dismisses the notification
 
 Loaded handoffs are archived to a `consumed/` subdirectory and won't appear again.
 
 ### Configuration
 
-Create `~/.claude/handoffs/config.yml` to customize retention limits:
+Create `~/.claude/handoffs/config.yml` to customize behavior:
 
 ```yaml
 max_handoffs: 5
+notification: proactive
 ```
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `max_handoffs` | 5 | Maximum pending handoffs kept per project (minimum 1) |
+| `max_handoffs` | `5` | Maximum pending handoffs kept per project (minimum 1) |
+| `notification` | `proactive` | How the SessionStart hook notifies about pending handoffs |
+
+#### Notification modes
+
+| Mode | Behavior |
+|------|----------|
+| `proactive` | Agent proactively mentions pending handoffs at session start (default) |
+| `passive` | Handoff info is available to the agent but it won't interrupt you. You can still say "load handoff" anytime. |
+| `quiet` | Hook produces no output. Fully manual: use "load handoff" or `/handoff --load` when you want to check. |
 
 Consumed handoffs are capped at 10 per project. Old handoffs beyond these limits are automatically deleted when you create a new handoff with `/handoff`.
 
