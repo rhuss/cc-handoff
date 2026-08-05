@@ -118,6 +118,9 @@ project: <project-slug>
 timestamp: "YYYYMMDD-HHMMSS"
 branch: <current-git-branch-or-none>
 summary: "<one-line summary of the session>"
+files:
+  - <path/to/file1>
+  - <path/to/file2>
 ---
 
 # Session Summary
@@ -146,6 +149,8 @@ Get the current git branch for the frontmatter:
 ```bash
 branch=$(git branch --show-current 2>/dev/null || echo "none")
 ```
+
+Collect files that were read, edited, or created during the session for the `files` frontmatter field. Include every file path that was part of the work, not just files that were modified. Use paths relative to the project root. If you are unsure whether a file was involved, include it. The next session needs these paths to locate the work without searching.
 
 **Minimal context sessions**: See the Minimal Context Sessions error handling section below.
 
