@@ -132,7 +132,9 @@ cc-handoff/
       plugin.json             # Plugin manifest
     hooks.json                # SessionStart hook registration
     scripts/
-      scan-pending.sh         # Hook script that scans for pending handoffs
+      get-project-slug.sh    # Shared project slug derivation
+      retention-cleanup.sh   # Prunes old handoffs beyond configured limit
+      scan-pending.sh        # SessionStart hook that scans for pending handoffs
     skills/
       handoff/
         SKILL.md              # /handoff slash command definition

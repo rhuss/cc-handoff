@@ -74,13 +74,10 @@ notification: passive
 
 ### 1. Derive Project Slug
 
-Determine the project identifier for organizing handoff files. This algorithm must match `get_project_slug()` in the scanner script.
+Determine the project identifier for organizing handoff files:
 
 ```bash
-slug=$(git remote get-url origin 2>/dev/null | sed 's/\.git$//' | sed 's|.*/||')
-[ -z "$slug" ] && slug=$(basename "$PWD")
-[ -z "$slug" ] && slug="unknown-project"
-echo "$slug"
+slug=$("${CLAUDE_PLUGIN_ROOT}/scripts/get-project-slug.sh")
 ```
 
 ### 2. Generate Timestamp
@@ -166,73 +163,13 @@ After writing, confirm:
 
 ### 8. Retention Cleanup
 
-After writing the new handoff, prune old handoffs to prevent unbounded accumulation.
-
-#### Read Configuration
-
-Read the retention limit from `~/.claude/handoffs/config.yml`:
+After writing the new handoff, run the retention cleanup script to prune old handoffs:
 
 ```bash
-config="$HOME/.claude/handoffs/config.yml"
-max_handoffs=5
-
-if [ -f "$config" ]; then
-  if command -v yq &>/dev/null; then
-    val=$(yq -r '.max_handoffs' "$config" 2>/dev/null)
-  else
-    val=$(grep -E '^max_handoffs:' "$config" 2>/dev/null | sed 's/^max_handoffs:[[:space:]]*//' | tr -d ' ')
-  fi
-
-  if [ -n "$val" ] && echo "$val" | grep -qE '^[0-9]+$'; then
-    max_handoffs=$val
-  elif [ -n "$val" ]; then
-    echo "Warning: Invalid max_handoffs value '$val' in config.yml, using default 5" >&2
-  fi
-
-  if [ "$max_handoffs" -lt 1 ]; then
-    echo "Warning: max_handoffs=$max_handoffs is below minimum, clamping to 1" >&2
-    max_handoffs=1
-  fi
-fi
+"${CLAUDE_PLUGIN_ROOT}/scripts/retention-cleanup.sh" "${slug}"
 ```
 
-#### Prune Pending Handoffs
-
-Count pending `.md` files for the current project. If the count exceeds `max_handoffs`, delete the oldest files:
-
-```bash
-handoff_dir="$HOME/.claude/handoffs/${slug}"
-pending_files=$(find "$handoff_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort)
-pending_count=$(echo "$pending_files" | grep -c '.' 2>/dev/null)
-pending_count=${pending_count:-0}
-
-if [ "$pending_count" -gt "$max_handoffs" ]; then
-  excess=$((pending_count - max_handoffs))
-  echo "$pending_files" | head -n "$excess" | while read -r f; do
-    rm -f "$f"
-  done
-fi
-```
-
-#### Prune Consumed Directory
-
-Keep at most 10 files in the consumed directory:
-
-```bash
-consumed_dir="$HOME/.claude/handoffs/${slug}/consumed"
-if [ -d "$consumed_dir" ]; then
-  consumed_files=$(find "$consumed_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort)
-  consumed_count=$(echo "$consumed_files" | grep -c '.' 2>/dev/null)
-  consumed_count=${consumed_count:-0}
-
-  if [ "$consumed_count" -gt 10 ]; then
-    excess=$((consumed_count - 10))
-    echo "$consumed_files" | head -n "$excess" | while read -r f; do
-      rm -f "$f"
-    done
-  fi
-fi
-```
+The script reads `max_handoffs` from `~/.claude/handoffs/config.yml` (default: 5, minimum: 1), deletes the oldest pending handoffs beyond the limit, and caps consumed files at 10 per project.
 
 ## Handoff Pickup
 

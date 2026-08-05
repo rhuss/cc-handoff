@@ -20,27 +20,11 @@ HANDOFFS_DIR="$HOME/.claude/handoffs"
 # --- Utility Functions ---
 
 # get_project_slug: prints the project slug to stdout
-# Returns: repository name from git remote, or basename of $PWD, or "unknown-project"
-# NOTE: This algorithm must match the slug derivation in SKILL.md step 1.
+# Delegates to the shared get-project-slug.sh script.
 get_project_slug() {
-  local remote_url slug
-
-  remote_url=$(git remote get-url origin 2>/dev/null) || true
-  if [ -n "$remote_url" ]; then
-    # Strip .git suffix, then extract last path component
-    slug="${remote_url%.git}"
-    slug="${slug##*/}"
-  fi
-
-  if [ -z "${slug:-}" ]; then
-    slug=$(basename "$PWD" 2>/dev/null) || true
-  fi
-
-  if [ -z "${slug:-}" ]; then
-    slug="unknown-project"
-  fi
-
-  echo "$slug"
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  bash "$script_dir/get-project-slug.sh"
 }
 
 # extract_frontmatter_field: extracts a YAML frontmatter field value from a file
