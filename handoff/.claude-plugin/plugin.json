@@ -1,0 +1,14 @@
+{
+  "name": "handoff",
+  "version": "1.0.0",
+  "description": "Session handoff documents for seamless context pickup across sessions",
+  "author": {
+    "name": "Roland Huss",
+    "email": "rhuss@redhat.com"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/rhuss/cc-handoff",
+  "homepage": "https://github.com/rhuss/cc-handoff",
+  "keywords": ["claude-code", "plugin", "session-handoff", "context-preservation"],
+  "hooks": "./hooks.json"
+}

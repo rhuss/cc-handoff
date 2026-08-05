@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+#
+# scan-pending.sh
+#
+# SessionStart hook script for the session-handoff skill.
+# Scans ~/.claude/handoffs/ for pending (unconsumed) handoff documents
+# across all project subdirectories and outputs a compact notification for the agent.
+#
+# Exit codes:
+#   0 - always (per EH-002: fail silently, never block session start)
+
+set -euo pipefail
+
+HANDOFFS_DIR="$HOME/.claude/handoffs"
+
+# --- Utility Functions ---
+
+# get_project_slug: prints the project slug to stdout
+# Returns: repository name from git remote, or basename of $PWD, or "unknown-project"
+# NOTE: This algorithm must match the slug derivation in SKILL.md step 1.
+get_project_slug() {
+  local remote_url slug
+
+  remote_url=$(git remote get-url origin 2>/dev/null) || true
+  if [ -n "$remote_url" ]; then
+    # Strip .git suffix, then extract last path component
+    slug="${remote_url%.git}"
+    slug="${slug##*/}"
+  fi
+
+  if [ -z "${slug:-}" ]; then
+    slug=$(basename "$PWD" 2>/dev/null) || true
+  fi
+
+  if [ -z "${slug:-}" ]; then
+    slug="unknown-project"
+  fi
+
+  echo "$slug"
+}
+
+# extract_frontmatter_field: extracts a YAML frontmatter field value from a file
+# Usage: extract_frontmatter_field <file> <field>
+# Returns: the field value (unquoted), or empty string if not found
+extract_frontmatter_field() {
+  local file="$1"
+  local field="$2"
+  local value
+
+  # Read between the first two --- lines, extract the field
+  value=$(sed -n '/^---$/,/^---$/p' "$file" 2>/dev/null \
+    | grep "^${field}:" \
+    | head -1 \
+    | sed "s/^${field}:[[:space:]]*//" \
+    | sed 's/^["'\'']\(.*\)["'\''"]$/\1/' || true)
+
+  echo "$value"
+}
+
+# format_date_short: converts YYYYMMDD-HHMMSS to "Mon DD" for compact display
+# Usage: format_date_short "20260804-143022"
+# Returns: "Aug 4"
+format_date_short() {
+  local ts="$1"
+  local date_part="${ts%%-*}"
+  local month="${date_part:4:2}"
+  local day="${date_part:6:2}"
+
+  day="${day#0}"
+
+  local month_names=("" "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+  local month_idx=$((10#$month))
+
+  echo "${month_names[$month_idx]} ${day}"
+}
+
+# --- Main Script ---
+
+main() {
+  # Exit silently if handoffs directory does not exist (EH-002)
+  if [ ! -d "$HANDOFFS_DIR" ]; then
+    exit 0
+  fi
+
+  local current_slug
+  current_slug=$(get_project_slug)
+
+  local current_count=0
+  local cross_count=0
+  local latest_ts=""
+
+  # Scan all project subdirectories, counting handoffs per category
+  for project_dir in "$HANDOFFS_DIR"/*/; do
+    [ ! -d "$project_dir" ] && continue
+
+    local project_name
+    project_name=$(basename "$project_dir")
+    [ "$project_name" = "consumed" ] && continue
+
+    for handoff_file in "$project_dir"*.md; do
+      [ ! -f "$handoff_file" ] && continue
+
+      # Skip empty files (EH-003)
+      if [ ! -s "$handoff_file" ]; then
+        echo "Warning: Skipping empty handoff file: $handoff_file" >&2
+        continue
+      fi
+
+      local summary
+      summary=$(extract_frontmatter_field "$handoff_file" "summary")
+
+      # Skip files with missing frontmatter (EH-003)
+      if [ -z "$summary" ]; then
+        echo "Warning: Skipping handoff with missing summary: $handoff_file" >&2
+        continue
+      fi
+
+      if [ "$project_name" = "$current_slug" ]; then
+        current_count=$((current_count + 1))
+        local filename
+        filename=$(basename "$handoff_file")
+        local ts_raw="${filename%.md}"
+        ts_raw=$(echo "$ts_raw" | sed 's/\([0-9]\{8\}-[0-9]\{6\}\)-[0-9]\{1,3\}$/\1/')
+        if [ -z "$latest_ts" ] || [[ "$ts_raw" > "$latest_ts" ]]; then
+          latest_ts="$ts_raw"
+        fi
+      else
+        cross_count=$((cross_count + 1))
+      fi
+    done
+  done
+
+  # Silent exit if no handoffs anywhere
+  if [ "$current_count" -eq 0 ] && [ "$cross_count" -eq 0 ]; then
+    exit 0
+  fi
+
+  # Build compact notification message
+  local message=""
+  if [ "$current_count" -gt 0 ]; then
+    local label="handoffs"
+    [ "$current_count" -eq 1 ] && label="handoff"
+    local latest_display
+    latest_display=$(format_date_short "$latest_ts")
+    message="${current_count} ${label} available (latest: ${latest_display})."
+    if [ "$cross_count" -gt 0 ]; then
+      message="${message} +${cross_count} from other projects."
+    fi
+    message="${message} Say \"load handoff\" to pick one up, or \"load latest handoff\" to skip selection."
+  else
+    local label="handoffs"
+    [ "$cross_count" -eq 1 ] && label="handoff"
+    message="${cross_count} ${label} available from other projects. Say \"load handoff\" to browse them."
+  fi
+
+  local content="<handoff-notify>${message}</handoff-notify>
+
+IMPORTANT: You MUST mention these pending handoffs to the user before responding to their first message."
+
+  # Escape for JSON embedding
+  local escaped
+  escaped="${content//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  escaped="${escaped//$'\n'/\\n}"
+  escaped="${escaped//$'\r'/\\r}"
+  escaped="${escaped//$'\t'/\\t}"
+
+  # Output as hookSpecificOutput JSON for Claude Code plugin hooks
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$escaped"
+}
+
+# EH-002 requires the script always exits 0.
+# EH-003 warnings go to stderr and are visible to the session.
+main "$@" || true

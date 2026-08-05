@@ -1,0 +1,16 @@
+{
+  "description": "Session handoff plugin hooks",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/scan-pending.sh\"",
+            "shell": "bash"
+          }
+        ]
+      }
+    ]
+  }
+}
