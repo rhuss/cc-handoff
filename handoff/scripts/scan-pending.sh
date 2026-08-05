@@ -5,6 +5,10 @@
 # SessionStart hook script for the session-handoff skill.
 # Scans ~/.claude/handoffs/ for pending (unconsumed) handoff documents
 # across all project subdirectories and outputs a compact notification for the agent.
+# Respects the `notification` key in ~/.claude/handoffs/config.yml:
+#   proactive (default) - outputs notification with MUST-mention directive
+#   passive             - outputs notification tag without directive
+#   quiet               - exits silently, no output
 #
 # Exit codes:
 #   0 - always (per EH-002: fail silently, never block session start)
@@ -82,6 +86,34 @@ main() {
     exit 0
   fi
 
+  # Read notification mode from config (default: proactive)
+  local config="$HOME/.claude/handoffs/config.yml"
+  local notification_mode="proactive"
+
+  if [ -f "$config" ]; then
+    local val=""
+    if command -v yq &>/dev/null; then
+      val=$(yq -r '.notification' "$config" 2>/dev/null)
+    else
+      val=$(grep -E '^notification:' "$config" 2>/dev/null | sed 's/^notification:[[:space:]]*//' | tr -d " \"'")
+    fi
+
+    if [ -n "$val" ] && [ "$val" != "null" ]; then
+      case "$val" in
+        proactive|passive|quiet)
+          notification_mode="$val"
+          ;;
+        *)
+          echo "Warning: Invalid notification value '$val' in config.yml, using default 'proactive'" >&2
+          ;;
+      esac
+    fi
+  fi
+
+  if [ "$notification_mode" = "quiet" ]; then
+    exit 0
+  fi
+
   local current_slug
   current_slug=$(get_project_slug)
 
@@ -153,9 +185,14 @@ main() {
     message="${cross_count} ${label} available from other projects. Say \"load handoff\" to browse them."
   fi
 
-  local content="<handoff-notify>${message}</handoff-notify>
+  local content
+  if [ "$notification_mode" = "proactive" ]; then
+    content="<handoff-notify>${message}</handoff-notify>
 
 IMPORTANT: You MUST mention these pending handoffs to the user before responding to their first message."
+  else
+    content="<handoff-notify>${message}</handoff-notify>"
+  fi
 
   # Escape for JSON embedding
   local escaped

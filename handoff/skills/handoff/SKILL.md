@@ -9,19 +9,66 @@ Write agent-authored handoff documents that preserve session context across sess
 
 ## Activation
 
-This skill activates when the user asks to:
-- Create a handoff or session handoff
-- Save session context for later
-- "handoff", "hand off", "session summary for next time"
-- Wrap up a session with notes for the next one
-- Preserve context before ending a session
-- Load, pick up, or resume a handoff
-- "load handoff", "load latest handoff", "pick up handoff"
-- Browse or list pending handoffs
+This skill activates when the user asks to create OR load a handoff.
+
+### Loading triggers (pick up existing handoffs)
+
+Activate on any of these phrases or close variations:
+- "load handoff"
+- "load latest handoff"
+- "load latest"
+- "pick up handoff"
+- "resume handoff"
+- "get handoff"
+- "show handoffs"
+- "list handoffs"
+- "check handoffs"
+- "what handoffs are pending"
+
+Also activate when `/handoff --load` or `/handoff --load-latest` is used.
+
+### Creation triggers (write a new handoff)
+
+Activate on any of these phrases or close variations:
+- "handoff", "hand off", "create handoff"
+- "session summary for next time"
+- "save session context for later"
+- "wrap up session with notes for the next one"
+- "preserve context before ending a session"
+
+Also activate when `/handoff` is used with no arguments.
 
 ## Arguments
 
-- **No args**: Create a handoff document for the current session.
+- **No args**: Create a handoff document for the current session (creation workflow).
+- **`--load`**: Load a handoff. Triggers the Loading Handoffs (Interactive Selection) flow. Equivalent to saying "load handoff".
+- **`--load-latest`**: Load the most recent handoff for the current project without showing a selection UI. Equivalent to saying "load latest handoff".
+
+## Configuration
+
+Configuration is stored in `~/.claude/handoffs/config.yml`. All keys are optional; the file itself is optional.
+
+### Available keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `max_handoffs` | integer | `5` | Maximum pending handoffs to retain per project. Oldest are pruned after creating a new handoff. Minimum value: 1. |
+| `notification` | string | `proactive` | Controls how the SessionStart hook notifies about pending handoffs. |
+
+### Notification modes
+
+The `notification` key accepts one of three values:
+
+- **`proactive`** (default): The SessionStart hook outputs a `<handoff-notify>` block with a directive that tells the agent to proactively mention pending handoffs to the user before responding to their first message.
+- **`passive`**: The hook outputs the `<handoff-notify>` block so the agent knows handoffs exist, but without the proactive-mention directive. The agent can reference handoffs if they become relevant but does not interrupt the user.
+- **`quiet`**: The hook exits silently with no output. Fully manual mode. The user must explicitly say "load handoff" or use `/handoff --load`.
+
+### Example config.yml
+
+```yaml
+max_handoffs: 10
+notification: passive
+```
 
 ## Workflow
 
@@ -184,7 +231,7 @@ fi
 
 ## Handoff Pickup
 
-When the SessionStart hook runs, it outputs a `<handoff-notify>` block with a compact count and date notification. The agent should recognize this context and be ready to help the user load handoffs.
+When the SessionStart hook runs, it checks the `notification` mode in `~/.claude/handoffs/config.yml` (see Configuration above). In `proactive` mode (default), it outputs a `<handoff-notify>` block with a directive for the agent to mention pending handoffs. In `passive` mode, the tag is present but the agent does not proactively announce handoffs. In `quiet` mode, the hook produces no output at all. Regardless of mode, the agent should be ready to help the user load handoffs when asked.
 
 ### Loading Handoffs (Interactive Selection)
 
