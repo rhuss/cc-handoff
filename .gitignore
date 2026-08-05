@@ -1,2 +1,18 @@
-.mcp.json
+# Plugin runtime
 .claude/settings.local.json
+.claude/handoff/
+
+# OS
+.DS_Store
+
+# Sensitive
+.mcp.json
+
+# spex: generated/local files (only constitution is committed)
+**/.claude/
+**/.agents/
+**/.codex/
+**/.specify/**
+!**/.specify/spex.json
+!**/.specify/memory/
+!**/.specify/memory/constitution.md

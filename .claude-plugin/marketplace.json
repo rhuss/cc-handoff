@@ -1,0 +1,24 @@
+{
+  "name": "cc-handoff-marketplace",
+  "owner": {
+    "name": "Roland Huss",
+    "email": "rhuss@redhat.com"
+  },
+  "metadata": {
+    "description": "Local development marketplace for the cc-handoff plugin."
+  },
+  "plugins": [
+    {
+      "name": "handoff",
+      "version": "1.0.0",
+      "description": "Session handoff documents for seamless context pickup across sessions",
+      "author": {
+        "name": "Roland Huss",
+        "email": "rhuss@redhat.com"
+      },
+      "source": "./handoff",
+      "homepage": "https://github.com/rhuss/cc-handoff",
+      "repository": "https://github.com/rhuss/cc-handoff.git"
+    }
+  ]
+}
