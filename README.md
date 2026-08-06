@@ -102,12 +102,14 @@ Create `~/.claude/handoffs/config.yml` to customize behavior:
 ```yaml
 max_handoffs: 5
 notification: proactive
+auto_handoff: false
 ```
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `max_handoffs` | `5` | Maximum pending handoffs kept per project (minimum 1) |
 | `notification` | `proactive` | How the SessionStart hook notifies about pending handoffs |
+| `auto_handoff` | `false` | When true, the agent proactively writes draft handoffs during sessions with significant context |
 
 #### Notification modes
 
@@ -145,10 +147,13 @@ cc-handoff/
 
 ```
 ~/.claude/handoffs/
+  config.yml                  # Optional configuration
   my-project/
     20260804-160741.md        # Pending handoff
     consumed/
       20260803-091522.md      # Archived (already loaded)
+    drafts/                   # Auto-handoff drafts (when auto_handoff: true)
+      20260804-150000.md      # Draft snapshot
   other-project/
     20260801-143022.md
 ```

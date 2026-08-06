@@ -54,6 +54,7 @@ Configuration is stored in `~/.claude/handoffs/config.yml`. All keys are optiona
 |-----|------|---------|-------------|
 | `max_handoffs` | integer | `5` | Maximum pending handoffs to retain per project. Oldest are pruned after creating a new handoff. Minimum value: 1. |
 | `notification` | string | `proactive` | Controls how the SessionStart hook notifies about pending handoffs. |
+| `auto_handoff` | boolean | `false` | When true, the agent proactively writes draft handoffs during sessions with significant accumulated context. |
 
 ### Notification modes
 
@@ -68,7 +69,56 @@ The `notification` key accepts one of three values:
 ```yaml
 max_handoffs: 10
 notification: passive
+auto_handoff: true
 ```
+
+## Auto-Handoff Drafts
+
+When `auto_handoff: true` is set in config, the agent proactively writes draft handoff documents during the session. This captures context incrementally so that even if the session ends without an explicit `/handoff`, useful context is preserved.
+
+### When to write a draft
+
+Write a draft when the session has accumulated significant context. Indicators:
+
+- Multiple files have been read, edited, or created
+- Important architectural or design decisions have been made
+- A long-running debugging or investigation sequence has produced findings
+- The session has been active for an extended period with substantive work
+
+Do NOT write a draft for trivial interactions (a single quick question, a one-line fix, casual conversation).
+
+### How to write a draft
+
+1. Read `auto_handoff` from `~/.claude/handoffs/config.yml`. If not `true`, do not write drafts.
+
+2. Derive the slug and create the drafts directory:
+   ```bash
+   slug=$("${CLAUDE_PLUGIN_ROOT}/scripts/get-project-slug.sh")
+   mkdir -p ~/.claude/handoffs/"${slug}"/drafts/
+   timestamp=$(date +%Y%m%d-%H%M%S)
+   ```
+
+3. Write the draft to `~/.claude/handoffs/<slug>/drafts/<timestamp>.md` using the Write tool. Use the same document structure as a regular handoff with `auto: true` in frontmatter:
+
+   ```markdown
+   ---
+   project: <project-slug>
+   timestamp: "YYYYMMDD-HHMMSS"
+   branch: <current-git-branch-or-none>
+   auto: true
+   summary: "<one-line summary of progress so far>"
+   files:
+     - <path/to/file1>
+   ---
+   ```
+
+4. Draft creation is silent. Do NOT ask for permission and do NOT announce that a draft was written.
+
+### Draft lifecycle
+
+- **User runs `/handoff`**: Step 1.5 reads drafts as additional context for the final handoff, then deletes them.
+- **Session ends without `/handoff`**: Drafts remain. At the next session start, the SessionStart hook promotes them to regular pending handoffs.
+- **Multiple concurrent sessions**: Each writes its own timestamped draft file, no conflicts.
 
 ## Workflow
 
@@ -79,6 +129,23 @@ Determine the project identifier for organizing handoff files:
 ```bash
 slug=$("${CLAUDE_PLUGIN_ROOT}/scripts/get-project-slug.sh")
 ```
+
+### 1.5. Check for Existing Drafts
+
+Check if draft handoffs exist for the current project:
+
+```bash
+drafts_dir=~/.claude/handoffs/"${slug}"/drafts
+```
+
+1. If `"$drafts_dir"` exists and contains `.md` files, read each draft using the Read tool.
+2. Use the draft content as additional context when authoring the final handoff (Step 5). Synthesize the information, do not copy verbatim.
+3. After the final handoff is written (after Step 6), delete all drafts:
+   ```bash
+   rm -f ~/.claude/handoffs/"${slug}"/drafts/*.md
+   ```
+
+If no drafts exist, skip this step.
 
 ### 2. Generate Timestamp
 
@@ -300,4 +367,4 @@ The following are explicitly not supported by this skill:
 - **Team-based handoffs**: Sharing handoffs between different users is not supported.
 - **Integration with external tools**: No integration with task trackers, project management tools, or external services.
 - **Handoff editing**: Once created, handoff documents are not intended to be modified.
-- **Automatic handoff creation**: Handoffs are only created when the user explicitly invokes `/handoff`.
+- **Automatic handoff creation**: Full handoffs are only created when the user explicitly invokes `/handoff`. When `auto_handoff` is enabled, the agent writes draft snapshots during the session, but these supplement rather than replace explicit handoffs.

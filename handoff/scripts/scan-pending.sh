@@ -94,12 +94,61 @@ main() {
     fi
   fi
 
+  # Read auto_handoff config (default: false)
+  local auto_handoff="false"
+
+  if [ -f "$config" ]; then
+    local ah_val=""
+    if command -v yq &>/dev/null; then
+      ah_val=$(yq -r '.auto_handoff' "$config" 2>/dev/null)
+    else
+      ah_val=$(grep -E '^auto_handoff:' "$config" 2>/dev/null | sed 's/^auto_handoff:[[:space:]]*//' | tr -d " \"'")
+    fi
+
+    if [ -n "$ah_val" ] && [ "$ah_val" != "null" ]; then
+      case "$ah_val" in
+        true|True|TRUE)
+          auto_handoff="true"
+          ;;
+        false|False|FALSE)
+          auto_handoff="false"
+          ;;
+        *)
+          echo "Warning: Invalid auto_handoff value '$ah_val' in config.yml, using default 'false'" >&2
+          ;;
+      esac
+    fi
+  fi
+
   if [ "$notification_mode" = "quiet" ]; then
     exit 0
   fi
 
   local current_slug
   current_slug=$(get_project_slug)
+
+  # Promote orphaned drafts to pending handoffs
+  if [ "$auto_handoff" = "true" ]; then
+    local drafts_dir="$HANDOFFS_DIR/${current_slug}/drafts"
+    if [ -d "$drafts_dir" ]; then
+      for draft_file in "$drafts_dir"/*.md; do
+        [ ! -f "$draft_file" ] && continue
+        local draft_basename
+        draft_basename=$(basename "$draft_file")
+        local target="$HANDOFFS_DIR/${current_slug}/${draft_basename}"
+        if [ -f "$target" ]; then
+          local suffix=1
+          local base="${draft_basename%.md}"
+          while [ -f "$HANDOFFS_DIR/${current_slug}/${base}-${suffix}.md" ]; do
+            suffix=$((suffix + 1))
+          done
+          target="$HANDOFFS_DIR/${current_slug}/${base}-${suffix}.md"
+        fi
+        mv "$draft_file" "$target" 2>/dev/null || \
+          echo "Warning: Failed to promote draft: $draft_file" >&2
+      done
+    fi
+  fi
 
   local current_count=0
   local cross_count=0
@@ -112,6 +161,7 @@ main() {
     local project_name
     project_name=$(basename "$project_dir")
     [ "$project_name" = "consumed" ] && continue
+    [ "$project_name" = "drafts" ] && continue
 
     for handoff_file in "$project_dir"*.md; do
       [ ! -f "$handoff_file" ] && continue
