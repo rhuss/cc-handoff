@@ -91,19 +91,19 @@ Do NOT write a draft for trivial interactions (a single quick question, a one-li
 
 1. Read `auto_handoff` from `~/.claude/handoffs/config.yml`. If not `true`, do not write drafts.
 
-2. Derive the slug and create the drafts directory:
+2. Derive the slug, create the drafts directory, and generate a filename:
    ```bash
    slug=$("${CLAUDE_PLUGIN_ROOT}/scripts/get-project-slug.sh")
    mkdir -p ~/.claude/handoffs/"${slug}"/drafts/
-   timestamp=$(date +%Y%m%d-%H%M%S)
    ```
+   Use the same `${date_prefix}-${semantic_slug}.md` naming as regular handoffs (see Step 2).
 
-3. Write the draft to `~/.claude/handoffs/<slug>/drafts/<timestamp>.md` using the Write tool. Use the same document structure as a regular handoff with `auto: true` in frontmatter:
+3. Write the draft to `~/.claude/handoffs/<slug>/drafts/<date>-<semantic-slug>.md` using the Write tool. Use the same document structure as a regular handoff with `auto: true` in frontmatter:
 
    ```markdown
    ---
    project: <project-slug>
-   timestamp: "YYYYMMDD-HHMMSS"
+   timestamp: "YYYY-MM-DD HH:MM"
    branch: <current-git-branch-or-none>
    auto: true
    summary: "<one-line summary of progress so far>"
@@ -147,11 +147,19 @@ drafts_dir=~/.claude/handoffs/"${slug}"/drafts
 
 If no drafts exist, skip this step.
 
-### 2. Generate Timestamp
+### 2. Generate Filename
+
+The filename combines a date prefix with a short semantic slug derived from the session's work:
 
 ```bash
-timestamp=$(date +%Y%m%d-%H%M%S)
+date_prefix=$(date +%Y-%m-%d)
 ```
+
+Derive a semantic slug (2-4 lowercase words, hyphenated) from the session's main topic or activity. Examples: `telemetry-discussion`, `auth-module-refactor`, `morning-paper-run`, `ci-pipeline-fix`.
+
+The full filename is: `${date_prefix}-${semantic_slug}.md`
+
+Examples: `2026-08-06-telemetry-discussion.md`, `2026-08-05-warm-pool-api.md`
 
 ### 3. Create Directory Structure
 
@@ -165,10 +173,10 @@ If `mkdir -p` fails, report the error clearly to the user including the target p
 
 ### 4. Determine Target Path
 
-The handoff file path is: `~/.claude/handoffs/"${slug}"/"${timestamp}".md`
+The handoff file path is: `~/.claude/handoffs/"${slug}"/"${date_prefix}-${semantic_slug}".md`
 
 Check if a file already exists at that path (collision). If it does, append a numeric suffix:
-- Try `${timestamp}-1.md`, then `${timestamp}-2.md`, and so on until an unused path is found.
+- Try `${date_prefix}-${semantic_slug}-1.md`, then `${date_prefix}-${semantic_slug}-2.md`, and so on until an unused path is found.
 
 ### 5. Author the Handoff Document
 
@@ -179,7 +187,7 @@ Write a markdown file with YAML frontmatter and five narrative sections. The age
 ```markdown
 ---
 project: <project-slug>
-timestamp: "YYYYMMDD-HHMMSS"
+timestamp: "YYYY-MM-DD HH:MM"
 branch: <current-git-branch-or-none>
 summary: "<one-line summary of the session>"
 files:

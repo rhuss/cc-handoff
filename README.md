@@ -147,15 +147,15 @@ cc-handoff/
 
 ```
 ~/.claude/handoffs/
-  config.yml                  # Optional configuration
+  config.yml                          # Optional configuration
   my-project/
-    20260804-160741.md        # Pending handoff
+    2026-08-04-auth-refactor.md       # Pending handoff
     consumed/
-      20260803-091522.md      # Archived (already loaded)
-    drafts/                   # Auto-handoff drafts (when auto_handoff: true)
-      20260804-150000.md      # Draft snapshot
+      2026-08-03-initial-setup.md     # Archived (already loaded)
+    drafts/                           # Auto-handoff drafts (when auto_handoff: true)
+      2026-08-04-debug-session.md     # Draft snapshot
   other-project/
-    20260801-143022.md
+    2026-08-01-ci-pipeline-fix.md
 ```
 
 ## License

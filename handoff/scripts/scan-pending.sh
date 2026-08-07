@@ -45,14 +45,22 @@ extract_frontmatter_field() {
   echo "$value"
 }
 
-# format_date_short: converts YYYYMMDD-HHMMSS to "Mon DD" for compact display
-# Usage: format_date_short "20260804-143022"
+# format_date_short: converts a date prefix to "Mon DD" for compact display
+# Handles both "20260804" (old format) and "2026-08-04" (new format)
 # Returns: "Aug 4"
 format_date_short() {
   local ts="$1"
-  local date_part="${ts%%-*}"
-  local month="${date_part:4:2}"
-  local day="${date_part:6:2}"
+  local month day
+
+  if [[ "$ts" == *-*-* ]]; then
+    # New format: 2026-08-04
+    month="${ts:5:2}"
+    day="${ts:8:2}"
+  else
+    # Old format: 20260804
+    month="${ts:4:2}"
+    day="${ts:6:2}"
+  fi
 
   day="${day#0}"
 
@@ -185,8 +193,10 @@ main() {
         current_count=$((current_count + 1))
         local filename
         filename=$(basename "$handoff_file")
-        local ts_raw="${filename%.md}"
-        ts_raw=$(echo "$ts_raw" | sed 's/\([0-9]\{8\}-[0-9]\{6\}\)-[0-9]\{1,3\}$/\1/')
+        # Extract date prefix for "latest" comparison
+        # Handles both old format (20260805-094822.md) and new format (2026-08-05-warm-pool-api.md)
+        local ts_raw
+        ts_raw=$(echo "$filename" | grep -oE '^[0-9]{4}-?[0-9]{2}-?[0-9]{2}')
         if [ -z "$latest_ts" ] || [[ "$ts_raw" > "$latest_ts" ]]; then
           latest_ts="$ts_raw"
         fi
