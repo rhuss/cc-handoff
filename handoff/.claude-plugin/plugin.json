@@ -1,6 +1,6 @@
 {
   "name": "handoff",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Session handoff documents for seamless context pickup across sessions",
   "author": {
     "name": "Roland Huss",
