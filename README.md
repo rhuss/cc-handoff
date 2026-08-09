@@ -108,6 +108,7 @@ auto_handoff: false
 | Key | Default | Description |
 |-----|---------|-------------|
 | `max_handoffs` | `5` | Maximum pending handoffs kept per project (minimum 1) |
+| `max_consumed` | `10` | Maximum consumed (archived) handoffs per project. `0` = keep none, `-1` = keep all. |
 | `notification` | `proactive` | How the SessionStart hook notifies about pending handoffs |
 | `auto_handoff` | `false` | When true, the agent proactively writes draft handoffs during sessions with significant context |
 
@@ -119,7 +120,7 @@ auto_handoff: false
 | `passive` | Handoff info is available to the agent but it won't interrupt you. You can still say "load handoff" anytime. |
 | `quiet` | Hook produces no output. Fully manual: use "load handoff" or `/handoff --load` when you want to check. |
 
-Consumed handoffs are capped at 10 per project. Old handoffs beyond these limits are automatically deleted when you create a new handoff with `/handoff`.
+Consumed handoffs are capped at `max_consumed` per project (default 10). Set to `0` to never keep consumed handoffs, or `-1` to keep all. Old handoffs beyond these limits are automatically deleted when you create a new handoff with `/handoff`.
 
 ## Directory layout
 

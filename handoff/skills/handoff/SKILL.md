@@ -53,6 +53,7 @@ Configuration is stored in `~/.claude/handoffs/config.yml`. All keys are optiona
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `max_handoffs` | integer | `5` | Maximum pending handoffs to retain per project. Oldest are pruned after creating a new handoff. Minimum value: 1. |
+| `max_consumed` | integer | `10` | Maximum consumed (archived) handoffs per project. `0` = keep none (delete immediately), `-1` = keep all (no limit). |
 | `notification` | string | `proactive` | Controls how the SessionStart hook notifies about pending handoffs. |
 | `auto_handoff` | boolean | `false` | When true, the agent proactively writes draft handoffs during sessions with significant accumulated context. |
 
@@ -244,7 +245,7 @@ After writing the new handoff, run the retention cleanup script to prune old han
 "${CLAUDE_PLUGIN_ROOT}/scripts/retention-cleanup.sh" "${slug}"
 ```
 
-The script reads `max_handoffs` from `~/.claude/handoffs/config.yml` (default: 5, minimum: 1), deletes the oldest pending handoffs beyond the limit, and caps consumed files at 10 per project.
+The script reads `max_handoffs` (default: 5) and `max_consumed` (default: 10) from `~/.claude/handoffs/config.yml`, pruning oldest files beyond each limit. Set `max_consumed: 0` to delete consumed handoffs immediately, or `max_consumed: -1` to keep all.
 
 ## Handoff Pickup
 

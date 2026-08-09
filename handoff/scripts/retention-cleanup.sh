@@ -7,8 +7,9 @@
 #
 # Usage: retention-cleanup.sh <project-slug>
 #
-# Reads max_handoffs from ~/.claude/handoffs/config.yml (default: 5).
-# Keeps at most max_handoffs pending files and 10 consumed files per project.
+# Reads max_handoffs and max_consumed from ~/.claude/handoffs/config.yml.
+# Defaults: max_handoffs=5, max_consumed=10.
+# max_consumed special values: 0 = keep none, -1 = keep all (no limit).
 #
 # Exit codes:
 #   0 - always
@@ -47,14 +48,33 @@ main() {
     fi
   fi
 
+  local max_consumed=10
+
+  if [ -f "$config" ]; then
+    local cval=""
+    if command -v yq &>/dev/null; then
+      cval=$(yq -r '.max_consumed' "$config" 2>/dev/null)
+    else
+      cval=$(grep -E '^max_consumed:' "$config" 2>/dev/null | sed 's/^max_consumed:[[:space:]]*//' | tr -d ' ')
+    fi
+
+    if [ -n "$cval" ] && [ "$cval" != "null" ] && echo "$cval" | grep -qE '^-?[0-9]+$'; then
+      max_consumed=$cval
+    elif [ -n "$cval" ] && [ "$cval" != "null" ]; then
+      echo "Warning: Invalid max_consumed value '$cval' in config.yml, using default 10" >&2
+    fi
+  fi
+
   # Prune pending handoffs
   local handoff_dir="$HANDOFFS_DIR/${slug}"
   if [ -d "$handoff_dir" ]; then
     local pending_files
+    local pending_files
     pending_files=$(find "$handoff_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort)
-    local pending_count
-    pending_count=$(echo "$pending_files" | grep -c '.' 2>/dev/null || echo 0)
-    pending_count=${pending_count:-0}
+    local pending_count=0
+    if [ -n "$pending_files" ]; then
+      pending_count=$(echo "$pending_files" | wc -l | tr -d ' ')
+    fi
 
     if [ "$pending_count" -gt "$max_handoffs" ]; then
       local excess=$((pending_count - max_handoffs))
@@ -64,20 +84,26 @@ main() {
     fi
   fi
 
-  # Prune consumed directory (max 10)
+  # Prune consumed directory
+  # max_consumed: -1 = keep all, 0 = keep none, N = keep at most N
   local consumed_dir="$HANDOFFS_DIR/${slug}/consumed"
-  if [ -d "$consumed_dir" ]; then
-    local consumed_files
-    consumed_files=$(find "$consumed_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort)
-    local consumed_count
-    consumed_count=$(echo "$consumed_files" | grep -c '.' 2>/dev/null || echo 0)
-    consumed_count=${consumed_count:-0}
+  if [ -d "$consumed_dir" ] && [ "$max_consumed" -ne -1 ]; then
+    if [ "$max_consumed" -eq 0 ]; then
+      find "$consumed_dir" -maxdepth 1 -name '*.md' -type f -delete 2>/dev/null || true
+    else
+      local consumed_files
+      consumed_files=$(find "$consumed_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort)
+      local consumed_count=0
+      if [ -n "$consumed_files" ]; then
+        consumed_count=$(echo "$consumed_files" | wc -l | tr -d ' ')
+      fi
 
-    if [ "$consumed_count" -gt 10 ]; then
-      local excess=$((consumed_count - 10))
-      echo "$consumed_files" | head -n "$excess" | while read -r f; do
-        rm -f "$f"
-      done
+      if [ "$consumed_count" -gt "$max_consumed" ]; then
+        local excess=$((consumed_count - max_consumed))
+        echo "$consumed_files" | head -n "$excess" | while read -r f; do
+          rm -f "$f"
+        done
+      fi
     fi
   fi
 
@@ -88,9 +114,10 @@ main() {
 
     local draft_files
     draft_files=$(find "$drafts_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort -r)
-    local draft_count
-    draft_count=$(echo "$draft_files" | grep -c '.' 2>/dev/null || echo 0)
-    draft_count=${draft_count:-0}
+    local draft_count=0
+    if [ -n "$draft_files" ]; then
+      draft_count=$(echo "$draft_files" | wc -l | tr -d ' ')
+    fi
 
     if [ "$draft_count" -gt 3 ]; then
       local excess=$((draft_count - 3))
